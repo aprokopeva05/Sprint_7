@@ -6,7 +6,9 @@ import edu.praktikum.sprint7.models.CourierCreds;
 import edu.praktikum.sprint7.models.CourierLoginResponse;
 import edu.praktikum.sprint7.models.CreateCourierResponse;
 import io.qameta.allure.Description;
+import io.qameta.allure.Epic;
 import io.qameta.allure.Feature;
+import io.qameta.allure.Step;
 import org.junit.jupiter.api.DisplayName;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.AfterEach;
@@ -17,12 +19,16 @@ import static edu.praktikum.sprint7.utils.Utils.*;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.*;
 
+@Epic("Sprint 7")
 @Feature("Создать курьера")
+@DisplayName("Тесты создания курьера")
 public class CreateCourierTest {
 
     private CourierApiClient courierApiClient;
     private Courier createdCourier;
     private String courierId;
+    private Response response;
+    private Response loginResponse;
 
     @BeforeEach
     public void setUp() {
@@ -31,30 +37,39 @@ public class CreateCourierTest {
 
     @AfterEach
     public void tearDown() {
-        // Очистка: удаляем созданного курьера после теста
-        if (courierId != null && !courierId.isEmpty()) {
-            courierApiClient.deleteCourier(courierId);
-        }
+        deleteCreatedCourier();
     }
 
+    @Step("Создание уникального курьера со всеми полями")
+    private Courier createUniqueCourier() {
+        return new Courier()
+                .setLogin(randomString())
+                .setPassword(randomString())
+                .setFirstName(randomString());
+    }
+
+    @Step("Создание курьера без поля login")
     private Courier createCourierWithoutLogin() {
         return new Courier()
                 .setPassword(randomString())
                 .setFirstName(randomString());
     }
 
+    @Step("Создание курьера без поля password")
     private Courier createCourierWithoutPassword() {
         return new Courier()
                 .setLogin(randomString())
                 .setFirstName(randomString());
     }
 
+    @Step("Создание курьера без поля firstName")
     private Courier createCourierWithoutFirstName() {
         return new Courier()
                 .setLogin(randomString())
                 .setPassword(randomString());
     }
 
+    @Step("Создание курьера с пустым логином")
     private Courier createCourierWithEmptyLogin() {
         return new Courier()
                 .setLogin("")
@@ -62,6 +77,7 @@ public class CreateCourierTest {
                 .setFirstName(randomString());
     }
 
+    @Step("Создание курьера с пустым паролем")
     private Courier createCourierWithEmptyPassword() {
         return new Courier()
                 .setLogin(randomString())
@@ -69,29 +85,82 @@ public class CreateCourierTest {
                 .setFirstName(randomString());
     }
 
+    @Step("Удаление созданного курьера (ID: {courierId})")
+    private void deleteCreatedCourier() {
+        if (courierId != null && !courierId.isEmpty()) {
+            courierApiClient.deleteCourier(courierId);
+        }
+    }
+
+    @Step("Отправка запроса на создание курьера")
+    private void sendCreateCourierRequest(Courier courier) {
+        response = courierApiClient.createCourier(courier);
+    }
+
+    @Step("Отправка запроса на создание дубликата курьера")
+    private void sendDuplicateCourierRequest() {
+        response = courierApiClient.createCourier(createdCourier);
+    }
+
+    @Step("Отправка запроса на авторизацию курьера")
+    private void sendLoginCourierRequest() {
+        loginResponse = courierApiClient.loginCourier(CourierCreds.fromCourier(createdCourier));
+    }
+
+    @Step("Проверка, что код ответа равен {expectedStatusCode}")
+    private void verifyStatusCode(Response response, int expectedStatusCode, String message) {
+        assertThat(message, response.statusCode(), equalTo(expectedStatusCode));
+    }
+
+    @Step("Проверка, что поле ok равно true")
+    private void verifyOkFieldIsTrue() {
+        CreateCourierResponse createResponse = response.as(CreateCourierResponse.class);
+        assertThat("Поле ok должно быть true", createResponse.isOk(), equalTo(true));
+    }
+
+    @Step("Проверка, что авторизация прошла успешно")
+    private void verifyLoginSuccess() {
+        assertThat("Курьер должен успешно авторизоваться", loginResponse.statusCode(), equalTo(200));
+    }
+
+    @Step("Получение ID курьера из ответа авторизации")
+    private void extractAndSaveCourierId() {
+        CourierLoginResponse loginResponseBody = loginResponse.as(CourierLoginResponse.class);
+        courierId = loginResponseBody.getId();
+        assertThat("ID курьера не должен быть пустым", courierId, notNullValue());
+    }
+
+    @Step("Проверка сообщения об ошибке: {expectedMessage}")
+    private void verifyErrorMessage(String expectedMessage) {
+        CreateCourierResponse errorResponse = response.as(CreateCourierResponse.class);
+        assertThat("Сообщение об ошибке должно соответствовать ожидаемому",
+                errorResponse.getMessage(), equalTo(expectedMessage));
+    }
+
+    @Step("Проверка сообщения об ошибке при создании дубликата")
+    private void verifyDuplicateErrorMessage() {
+        CreateCourierResponse errorResponse = response.as(CreateCourierResponse.class);
+        assertThat("Сообщение об ошибке должно быть о существующем логине",
+                errorResponse.getMessage(), containsString("Этот логин уже используется"));
+    }
+
+    @Step("Проверка, что ID курьера получен и не пустой")
+    private void verifyCourierIdIsNotNull() {
+        assertThat("ID курьера не должен быть пустым", courierId, notNullValue());
+    }
+
     @Test
     @DisplayName("Создание курьера - успешный сценарий")
     @Description("Проверка, что курьера можно успешно создать со всеми обязательными полями")
     public void createCourierSuccessTest() {
         createdCourier = createUniqueCourier();
-
-        Response response = courierApiClient.createCourier(createdCourier);
-
-        assertThat("Код ответа должен быть 201 Created",
-                response.statusCode(), equalTo(201));
-
-        CreateCourierResponse createResponse = response.as(CreateCourierResponse.class);
-        assertThat("Поле ok должно быть true",
-                createResponse.isOk(), equalTo(true));
-
-        Response loginResponse = courierApiClient.loginCourier(CourierCreds.fromCourier(createdCourier));
-        assertThat("Курьер должен успешно авторизоваться после создания",
-                loginResponse.statusCode(), equalTo(200));
-
-        CourierLoginResponse loginResponseBody = loginResponse.as(CourierLoginResponse.class);
-        courierId = loginResponseBody.getId();
-        assertThat("ID курьера не должен быть пустым",
-                courierId, notNullValue());
+        sendCreateCourierRequest(createdCourier);
+        verifyStatusCode(response, 201, "Код ответа должен быть 201 Created");
+        verifyOkFieldIsTrue();
+        sendLoginCourierRequest();
+        verifyLoginSuccess();
+        extractAndSaveCourierId();
+        verifyCourierIdIsNotNull();
     }
 
     @Test
@@ -99,18 +168,11 @@ public class CreateCourierTest {
     @Description("Проверка, что в запросе нужно передать все обязательные поля (login, password, firstName)")
     public void createCourierAllRequiredFieldsTest() {
         createdCourier = createUniqueCourier();
-
-        Response response = courierApiClient.createCourier(createdCourier);
-
-        assertThat("Код ответа должен быть 201",
-                response.statusCode(), equalTo(201));
-
-        Response loginResponse = courierApiClient.loginCourier(CourierCreds.fromCourier(createdCourier));
-        assertThat("Авторизация должна быть успешной",
-                loginResponse.statusCode(), equalTo(200));
-
-        CourierLoginResponse loginResponseBody = loginResponse.as(CourierLoginResponse.class);
-        courierId = loginResponseBody.getId();
+        sendCreateCourierRequest(createdCourier);
+        verifyStatusCode(response, 201, "Код ответа должен быть 201");
+        sendLoginCourierRequest();
+        verifyLoginSuccess();
+        extractAndSaveCourierId();
     }
 
     @Test
@@ -119,22 +181,15 @@ public class CreateCourierTest {
     public void createDuplicateCourierTest() {
         createdCourier = createUniqueCourier();
 
-        Response firstResponse = courierApiClient.createCourier(createdCourier);
-        assertThat("Первый курьер должен создаться успешно",
-                firstResponse.statusCode(), equalTo(201));
+        sendCreateCourierRequest(createdCourier);
+        verifyStatusCode(response, 201, "Первый курьер должен создаться успешно");
 
-        Response loginResponse = courierApiClient.loginCourier(CourierCreds.fromCourier(createdCourier));
-        CourierLoginResponse loginResponseBody = loginResponse.as(CourierLoginResponse.class);
-        courierId = loginResponseBody.getId();
+        sendLoginCourierRequest();
+        extractAndSaveCourierId();
 
-        Response duplicateResponse = courierApiClient.createCourier(createdCourier);
-
-        assertThat("Код ответа для дубликата должен быть 409 Conflict",
-                duplicateResponse.statusCode(), equalTo(409));
-
-        CreateCourierResponse errorResponse = duplicateResponse.as(CreateCourierResponse.class);
-        assertThat("Сообщение об ошибке должно быть о существующем логине",
-                errorResponse.getMessage(), containsString("Этот логин уже используется"));
+        sendDuplicateCourierRequest();
+        verifyStatusCode(response, 409, "Код ответа для дубликата должен быть 409 Conflict");
+        verifyDuplicateErrorMessage();
     }
 
     @Test
@@ -142,15 +197,9 @@ public class CreateCourierTest {
     @Description("Проверка, что при отсутствии поля login возвращается ошибка 400")
     public void createCourierWithoutLoginTest() {
         Courier courierWithoutLogin = createCourierWithoutLogin();
-
-        Response response = courierApiClient.createCourier(courierWithoutLogin);
-
-        assertThat("Код ответа должен быть 400 Bad Request",
-                response.statusCode(), equalTo(400));
-
-        CreateCourierResponse errorResponse = response.as(CreateCourierResponse.class);
-        assertThat("Сообщение об ошибке должно быть о недостатке данных",
-                errorResponse.getMessage(), equalTo("Недостаточно данных для создания учетной записи"));
+        sendCreateCourierRequest(courierWithoutLogin);
+        verifyStatusCode(response, 400, "Код ответа должен быть 400 Bad Request");
+        verifyErrorMessage("Недостаточно данных для создания учетной записи");
     }
 
     @Test
@@ -158,15 +207,9 @@ public class CreateCourierTest {
     @Description("Проверка, что при отсутствии поля password возвращается ошибка 400")
     public void createCourierWithoutPasswordTest() {
         Courier courierWithoutPassword = createCourierWithoutPassword();
-
-        Response response = courierApiClient.createCourier(courierWithoutPassword);
-
-        assertThat("Код ответа должен быть 400 Bad Request",
-                response.statusCode(), equalTo(400));
-
-        CreateCourierResponse errorResponse = response.as(CreateCourierResponse.class);
-        assertThat("Сообщение об ошибке должно быть о недостатке данных",
-                errorResponse.getMessage(), equalTo("Недостаточно данных для создания учетной записи"));
+        sendCreateCourierRequest(courierWithoutPassword);
+        verifyStatusCode(response, 400, "Код ответа должен быть 400 Bad Request");
+        verifyErrorMessage("Недостаточно данных для создания учетной записи");
     }
 
     @Test
@@ -174,15 +217,9 @@ public class CreateCourierTest {
     @Description("Проверка, что при пустом поле login возвращается ошибка 400")
     public void createCourierWithEmptyLoginTest() {
         Courier courierWithEmptyLogin = createCourierWithEmptyLogin();
-
-        Response response = courierApiClient.createCourier(courierWithEmptyLogin);
-
-        assertThat("Код ответа должен быть 400 Bad Request",
-                response.statusCode(), equalTo(400));
-
-        CreateCourierResponse errorResponse = response.as(CreateCourierResponse.class);
-        assertThat("Сообщение об ошибке должно быть о недостатке данных",
-                errorResponse.getMessage(), equalTo("Недостаточно данных для создания учетной записи"));
+        sendCreateCourierRequest(courierWithEmptyLogin);
+        verifyStatusCode(response, 400, "Код ответа должен быть 400 Bad Request");
+        verifyErrorMessage("Недостаточно данных для создания учетной записи");
     }
 
     @Test
@@ -190,15 +227,9 @@ public class CreateCourierTest {
     @Description("Проверка, что при пустом поле password возвращается ошибка 400")
     public void createCourierWithEmptyPasswordTest() {
         Courier courierWithEmptyPassword = createCourierWithEmptyPassword();
-
-        Response response = courierApiClient.createCourier(courierWithEmptyPassword);
-
-        assertThat("Код ответа должен быть 400 Bad Request",
-                response.statusCode(), equalTo(400));
-
-        CreateCourierResponse errorResponse = response.as(CreateCourierResponse.class);
-        assertThat("Сообщение об ошибке должно быть о недостатке данных",
-                errorResponse.getMessage(), equalTo("Недостаточно данных для создания учетной записи"));
+        sendCreateCourierRequest(courierWithEmptyPassword);
+        verifyStatusCode(response, 400, "Код ответа должен быть 400 Bad Request");
+        verifyErrorMessage("Недостаточно данных для создания учетной записи");
     }
 
     @Test
@@ -206,16 +237,10 @@ public class CreateCourierTest {
     @Description("Проверка, что поле ok в ответе равно true при успешном создании")
     public void createCourierReturnsOkTrueTest() {
         createdCourier = createUniqueCourier();
-
-        Response response = courierApiClient.createCourier(createdCourier);
-
-        CreateCourierResponse createResponse = response.as(CreateCourierResponse.class);
-        assertThat("Поле ok должно быть true",
-                createResponse.isOk(), equalTo(true));
-
-        Response loginResponse = courierApiClient.loginCourier(CourierCreds.fromCourier(createdCourier));
-        CourierLoginResponse loginResponseBody = loginResponse.as(CourierLoginResponse.class);
-        courierId = loginResponseBody.getId();
+        sendCreateCourierRequest(createdCourier);
+        verifyOkFieldIsTrue();
+        sendLoginCourierRequest();
+        extractAndSaveCourierId();
     }
 
     @Test
@@ -223,21 +248,11 @@ public class CreateCourierTest {
     @Description("Проверка, что поле firstName может быть пустым (необязательное поле)")
     public void createCourierWithEmptyFirstNameTest() {
         createdCourier = createCourierWithoutFirstName();
-
-        Response response = courierApiClient.createCourier(createdCourier);
-
-        assertThat("Код ответа должен быть 201 даже без firstName",
-                response.statusCode(), equalTo(201));
-
-        CreateCourierResponse createResponse = response.as(CreateCourierResponse.class);
-        assertThat("Поле ok должно быть true",
-                createResponse.isOk(), equalTo(true));
-
-        Response loginResponse = courierApiClient.loginCourier(CourierCreds.fromCourier(createdCourier));
-        assertThat("Курьер без firstName должен авторизоваться",
-                loginResponse.statusCode(), equalTo(200));
-
-        CourierLoginResponse loginResponseBody = loginResponse.as(CourierLoginResponse.class);
-        courierId = loginResponseBody.getId();
+        sendCreateCourierRequest(createdCourier);
+        verifyStatusCode(response, 201, "Код ответа должен быть 201 даже без firstName");
+        verifyOkFieldIsTrue();
+        sendLoginCourierRequest();
+        verifyLoginSuccess();
+        extractAndSaveCourierId();
     }
 }

@@ -1,11 +1,13 @@
 package edu.praktikum.sprint7.utils;
 
-import edu.praktikum.sprint7.generator.CourierGenerator;
+import com.github.javafaker.Faker;
 import edu.praktikum.sprint7.models.Courier;
 
-import java.util.Random;
+import java.util.Locale;
 
 public class Utils {
+
+    private static final Faker faker = new Faker(new Locale("ru"));
 
     // Метод для генерации случайной строки
     public static String randomString() {
@@ -13,66 +15,80 @@ public class Utils {
     }
 
     public static String randomString(int length) {
-        Random random = new Random();
-        int leftLimit = 97; // буквы a-z
-        int rightLimit = 122;
-        StringBuilder buffer = new StringBuilder(length);
+        return faker.lorem().characters(length, true, true);
+    }
 
-        for (int i = 0; i < length; i++) {
-            int randomLimitedInt = leftLimit + (int) (random.nextFloat() * (float) (rightLimit - leftLimit + 1));
-            buffer.append(Character.toChars(randomLimitedInt));
-        }
+    // Генерация реальных имен, фамилий и т.д.
+    public static String randomFirstName() {
+        return faker.name().firstName();
+    }
 
-        return buffer.toString();
+    public static String randomLastName() {
+        return faker.name().lastName();
+    }
+
+    public static String randomPhone() {
+        return faker.phoneNumber().phoneNumber();
+    }
+
+    public static String randomAddress() {
+        return faker.address().fullAddress();
+    }
+
+    public static String randomEmail() {
+        return faker.internet().emailAddress();
     }
 
     // Создает уникального курьера и возвращает его
     public static Courier createUniqueCourier() {
-        return CourierGenerator.randomCourier();
+        return new Courier()
+                .setLogin(faker.name().username())
+                .setPassword(faker.internet().password())
+                .setFirstName(faker.name().firstName());
     }
 
     // Создает курьера с заданным логином
     public static Courier createCourierWithLogin(String login) {
         return new Courier()
                 .setLogin(login)
-                .setPassword(randomString())
-                .setFirstName(randomString());
+                .setPassword(faker.internet().password())
+                .setFirstName(faker.name().firstName());
     }
 
     // Создает курьера без пароля
     public static Courier createCourierWithoutPassword() {
         return new Courier()
-                .setLogin(randomString())
-                .setFirstName(randomString());
+                .setLogin(faker.name().username())
+                .setFirstName(faker.name().firstName());
     }
 
     // Создает курьера без логина
     public static Courier createCourierWithoutLogin() {
         return new Courier()
-                .setPassword(randomString())
-                .setFirstName(randomString());
+                .setPassword(faker.internet().password())
+                .setFirstName(faker.name().firstName());
     }
 
     // Создает курьера без имени
     public static Courier createCourierWithoutFirstName() {
         return new Courier()
-                .setLogin(randomString())
-                .setPassword(randomString());
+                .setLogin(faker.name().username())
+                .setPassword(faker.internet().password());
     }
 
     // Создает курьера с пустым логином
     public static Courier createCourierWithEmptyLogin() {
         return new Courier()
                 .setLogin("")
-                .setPassword(randomString())
-                .setFirstName(randomString());
+                .setPassword(faker.internet().password())
+                .setFirstName(faker.name().firstName());
     }
 
     // Создает курьера с пустым паролем
     public static Courier createCourierWithEmptyPassword() {
         return new Courier()
-                .setLogin(randomString())
+                .setLogin(faker.name().username())
                 .setPassword("")
-                .setFirstName(randomString());
+                .setFirstName(faker.name().firstName());
     }
 }
